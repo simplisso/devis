@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Catalogue Produits & Équipements</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="header">
+    <h2>Étape 2/3 : Sélection des Équipements et Fournitures</h2>
+</div>
+
+<div class="container">
+    <p style="font-style: italic;">Sélectionnez les quantités requises. Vous pouvez **modifier les prix unitaires** ou ajouter des produits non listés.</p>
+
+    <form id="catalogueForm">
+        
+        <div id="catalogue-content">
+            </div>
+
+        <div class="app-controls">
+            <h3>Ajout d'une Ligne Personnalisée</h3>
+            <div style="display: flex; gap: 15px;">
+                <input type="text" id="new-designation" placeholder="Désignation (ex: Gaine ICTA)" style="flex: 2;">
+                <input type="text" id="new-category" placeholder="Catégorie (ex: Divers)" value="Divers" style="flex: 1;">
+                <input type="number" id="new-qty" placeholder="Qté" value="1" min="1" style="flex: 0.5;">
+                <input type="number" id="new-price" placeholder="P.U. HT (F CFA)" min="0" style="flex: 1.5;">
+                <button type="button" class="btn btn-warning" onclick="addNewCustomLine()" style="flex: 1;">+ Ajouter</button>
+            </div>
+        </div>
+        
+        <div style="margin-top: 30px; text-align: right;">
+            <button type="submit" class="btn btn-success">Passer à l'Aperçu Final (Étape 3) &rarr;</button>
+        </div>
+        
+    </form>
+</div>
+
+<script>
+    // Liste initiale simulée de produits (sera chargée par le Back-End)
+    const initialProducts = [
+        { cat: 'Câbles & Gaines', designation: 'Câble R2V 2x2.5mm² (m)', price: 1500, qty: 0, removable: false },
+        { cat: 'Appareillage', designation: 'Prise standard 2P+T', price: 2500, qty: 0, removable: false },
+        { cat: 'Appareillage', designation: 'Interrupteur simple allumage', price: 2000, qty: 0, removable: false },
+        { cat: 'Éclairage', designation: 'Spot LED encastrable 7W', price: 3500, qty: 0, removable: false },
+        // Ligne de démo modifiable/retirable
+        { cat: 'Divers', designation: 'Consultation technique (Forfait)', price: 10000, qty: 1, removable: true },
+    ];
+
+    // Charger les lignes existantes ou utiliser la liste initiale
+    let devisLines = JSON.parse(localStorage.getItem('devis_lines')) || initialProducts;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        renderCatalogue();
+    });
+
+    function renderCatalogue() {
+        const contentDiv = document.getElementById('catalogue-content');
+        contentDiv.innerHTML = '';
+        
+        // 1. Regrouper par catégorie
+        const categories = [...new Set(devisLines.map(item => item.cat))];
+        
+        // 2. Générer le HTML
+        categories.forEach(cat => {
+            const linesForCat = devisLines.map((item, index) => {
+                if (item.cat === cat) {
+                    return renderLine(item, index);
+                }
+                return '';
+            }).join('');
+
+            const catHtml = `
+                <h3>${cat}</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 40%;">Désignation</th>
+                            <th style="width: 15%;">Qté</th>
+                            <th style="width: 20%;">P.U. HT (F CFA)</th>
+                            <th style="width: 15%;">Total HT</th>
+                            <th style="width: 10%;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>${linesForCat}</tbody>
+                </table>
+            `;
+            contentDiv.innerHTML += catHtml;
+        });
+        calculateLineTotals();
+    }
+
+    function renderLine(item, index) {
+        // Le prix et la quantité sont des INPUTS pour la MODIFIABILITÉ
+        const removeBtn = item.removable ? `<button type="button" class="btn-remove" onclick="removeLine(${index})">X</button>` : '';
+
+        return `
+            <tr data-index="${index}" class="devis-line">
+                <td><input type="text" value="${item.designation}" oninput="updateLineData(${index}, 'designation', this.value)" style="border: none;"></td>
+                <td><input type="number" class="qty-input" value="${item.qty}" min="0" oninput="updateLineData(${index}, 'qty', this.value)"></td>
+                <td><input type="number" class="price-input" value="${item.price}" min="0" oninput="updateLineData(${index}, 'price', this.value)"></td>
+                <td class="line-total-display">0 F CFA</td>
+                <td style="text-align: center;">${removeBtn}</td>
+            </tr>
+        `;
+    }
+
+    function updateLineData(index, key, value) {
+        if (key === 'qty' || key === 'price') {
+            devisLines[index][key] = parseFloat(value) || 0;
+            calculateLineTotals();
+        } else if (key === 'designation') {
+            devisLines[index][key] = value;
+        }
+        localStorage.setItem('devis_lines', JSON.stringify(devisLines));
+    }
+    
+    function removeLine(index) {
+        if (confirm("Voulez-vous retirer cette ligne ?")) {
+            devisLines.splice(index, 1);
+            localStorage.setItem('devis_lines', JSON.stringify(devisLines));
+            renderCatalogue(); // Re-render pour mettre à jour les index et l'affichage
+        }
+    }
+
+    function addNewCustomLine() {
+        const designation = document.getElementById('new-designation').value;
+        const cat = document.getElementById('new-category').value;
+        const qty = parseFloat(document.getElementById('new-qty').value) || 1;
+        const price = parseFloat(document.getElementById('new-price').value) || 0;
+
+        if (designation && price > 0) {
+            // Ajouter la nouvelle ligne comme "removable"
+            devisLines.push({ cat, designation, price, qty, removable: true });
+            localStorage.setItem('devis_lines', JSON.stringify(devisLines));
+            renderCatalogue(); 
+            
+            // Nettoyage
+            document.getElementById('new-designation').value = '';
+            document.getElementById('new-qty').value = '1';
+            document.getElementById('new-price').value = '';
+        } else {
+            alert('Veuillez entrer une désignation, une quantité et un prix unitaire valide.');
+        }
+    }
+
+    function calculateLineTotals() {
+        let totalHT = 0;
+        document.querySelectorAll('.devis-line').forEach(row => {
+            const index = row.getAttribute('data-index');
+            const item = devisLines[index];
+            if (item) { // Vérification de sécurité
+                 const lineTotal = (item.qty || 0) * (item.price || 0);
+                 row.querySelector('.line-total-display').textContent = lineTotal.toLocaleString('fr-FR') + ' F CFA';
+                 totalHT += lineTotal;
+            }
+        });
+        localStorage.setItem('products_total_ht', totalHT);
+    }
+
+    document.getElementById('catalogueForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        window.location.href = 'recap.html';
+    });
+</script>
+
+</body>
+</html>

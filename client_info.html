@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Saisie des Informations du Devis</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Ajout de style spécifique pour masquer/afficher les options */
+        .mo-calculation-fields {
+            display: none; /* Masqué par défaut */
+            padding: 10px;
+            border-left: 3px solid #007bff;
+            margin-top: 10px;
+        }
+        .mo-direct-input-field {
+            display: none; /* Masqué par défaut */
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h2>Étape 1/3 : Informations de Base du Devis</h2>
+</div>
+
+<div class="container">
+    <form id="infoForm">
+        
+        <div style="display: flex; gap: 30px;">
+            <div style="flex: 1;">
+                <h3>Votre Structure (Entête du Devis) 🏢</h3>
+                <div class="form-group"><label>Nom de Votre Société:</label><input type="text" id="ma_societe" value="Société Alpha Élec" required></div>
+                <div class="form-group"><label>Adresse / Coordonnées:</label><input type="text" id="mon_adresse" value="123 Rue du Courant, Ville" required></div>
+                <div class="form-group"><label>N° SIRET / Registre:</label><input type="text" id="mon_siret" value="00123456789" required></div>
+            </div>
+
+            <div style="flex: 1;">
+                <h3>Client Final et Références 🧑‍🤝‍🧑</h3>
+                <div class="form-group"><label>Nom du Client:</label><input type="text" id="client_nom" value="Mme Dubois"></div>
+                <div class="form-group"><label>Adresse du Chantier:</label><input type="text" id="client_adresse" value="456 Avenue des Roses"></div>
+                <div class="form-group"><label>N° Devis:</label><input type="text" id="num_devis" value="DEV-2025-001"></div>
+            </div>
+        </div>
+
+        <div class="app-controls">
+            <h3>Estimation Main d'Œuvre (MO) 👷</h3>
+            
+            <div class="form-group">
+                <label for="mo-type">Mode de saisie de la Main d'Œuvre :</label>
+                <select id="mo-type" onchange="toggleMOType()">
+                    <option value="calculated">Calcul (Taux Horaire x Heures)</option>
+                    <option value="direct">Saisie Directe (Forfait HT)</option>
+                </select>
+            </div>
+
+            <div id="calculated-fields" class="mo-calculation-fields" style="display: block;">
+                <div style="display: flex; gap: 30px;">
+                    <div class="form-group" style="flex: 1;"><label>Taux Horaire HT (F CFA):</label><input type="number" id="taux_horaire" value="5000" min="0" oninput="calculateMO()"></div>
+                    <div class="form-group" style="flex: 1;"><label>Nombre d'Heures Estimées:</label><input type="number" id="nb_heures" value="10" min="0" oninput="calculateMO()"></div>
+                    <div class="form-group" style="flex: 1;"><label>Coût Total MO (Calculé):</label><input type="text" id="total_mo_calculated" value="50 000 F CFA" readonly style="background-color: #f0f0f0;"></div>
+                </div>
+            </div>
+
+            <div id="direct-field" class="mo-direct-input-field">
+                <div class="form-group"><label>Coût Total Main d'Œuvre (Forfait HT en F CFA):</label><input type="number" id="total_mo_direct" value="50000" min="0" oninput="calculateMO()"></div>
+            </div>
+        </div>
+
+        <div style="margin-top: 30px; text-align: right;">
+            <button type="submit" class="btn btn-success">Passer au Catalogue (Étape 2) &rarr;</button>
+        </div>
+
+    </form>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', initializeMO);
+
+    function initializeMO() {
+        // Assurez-vous que le bon mode est affiché au chargement
+        toggleMOType();
+        calculateMO();
+    }
+
+    function toggleMOType() {
+        const type = document.getElementById('mo-type').value;
+        const calculatedDiv = document.getElementById('calculated-fields');
+        const directDiv = document.getElementById('direct-field');
+
+        if (type === 'calculated') {
+            calculatedDiv.style.display = 'block';
+            directDiv.style.display = 'none';
+        } else {
+            calculatedDiv.style.display = 'none';
+            directDiv.style.display = 'block';
+        }
+        calculateMO(); // Recalculer après le changement de mode
+    }
+    
+    function calculateMO() {
+        const type = document.getElementById('mo-type').value;
+        let total = 0;
+
+        if (type === 'calculated') {
+            const taux = parseFloat(document.getElementById('taux_horaire').value) || 0;
+            const heures = parseFloat(document.getElementById('nb_heures').value) || 0;
+            total = taux * heures;
+            // Mettre à jour l'affichage du champ calculé
+            document.getElementById('total_mo_calculated').value = total.toLocaleString('fr-FR') + ' F CFA';
+        } else {
+            // Utiliser la valeur saisie directement
+            total = parseFloat(document.getElementById('total_mo_direct').value) || 0;
+        }
+        
+        // Stocker le total final de la MO (calculé ou saisi) pour le récap
+        localStorage.setItem('temp_mo_total_value', total);
+    }
+
+    document.getElementById('infoForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Récupérer le total MO stocké par la fonction calculateMO
+        const finalMoTotal = parseFloat(localStorage.getItem('temp_mo_total_value')) || 0;
+        const moType = document.getElementById('mo-type').value;
+        
+        // Sauvegarde de toutes les infos du devis pour le récap
+        localStorage.setItem('devis_info', JSON.stringify({
+            societe: document.getElementById('ma_societe').value,
+            adresse: document.getElementById('mon_adresse').value,
+            siret: document.getElementById('mon_siret').value,
+            client_nom: document.getElementById('client_nom').value,
+            client_adresse: document.getElementById('client_adresse').value,
+            num_devis: document.getElementById('num_devis').value,
+            // Main d'œuvre finale à utiliser dans le calcul du récap
+            mo_total: finalMoTotal,
+            mo_type: moType 
+        }));
+        
+        // Redirection vers l'étape suivante
+        window.location.href = 'catalogue.html';
+    });
+</script>
+
+</body>
+</html>

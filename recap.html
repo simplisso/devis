@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Aperçu Final du Devis</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+
+<div class="header">
+    <h2>Étape 3/3 : Aperçu Final du Devis</h2>
+</div>
+
+<div class="container">
+    <div class="devis-content">
+        
+        <div class="devis-header">
+            <div id="societe-info"></div>
+            <div id="client-info" style="text-align: right;"></div>
+        </div>
+
+        <h3>Détail des Équipements</h3>
+
+        <table id="recap-table">
+            <thead>
+                <tr>
+                    <th style="width: 45%;">Désignation</th>
+                    <th style="width: 10%;">Qté</th>
+                    <th style="width: 15%;">P.U. HT (F CFA)</th>
+                    <th style="width: 15%;">Total HT</th>
+                </tr>
+            </thead>
+            <tbody id="recap-tbody">
+                </tbody>
+        </table>
+        
+        <div class="clear"></div>
+
+        <div class="totals-section">
+            <table>
+                <tr><td>Total Produits HT</td><td id="total-produits" style="text-align: right;">0 F CFA</td></tr>
+                <tr><td>Main d'Œuvre HT</td><td id="total-mo" style="text-align: right;">0 F CFA</td></tr>
+                <tr><td style="font-weight: bold;">TOTAL H.T.</td><td id="grand-total-ht" style="font-weight: bold; text-align: right;">0 F CFA</td></tr>
+                <tr><td>TVA (20%)</td><td id="tva-amount" style="text-align: right;">0 F CFA</td></tr>
+                <tr><td style="font-weight: bold;">TOTAL T.T.C.</td><td id="grand-total-ttc" style="text-align: right;">0 F CFA</td></tr>
+            </table>
+        </div>
+        <div class="clear"></div>
+
+        <div style="margin-top: 80px; text-align: right;">
+            <p>Signature/Acceptation Client (Nom):</p>
+            <input type="text" id="client-signature" placeholder="Entrez le nom pour acceptation électronique" style="width: 40%; padding: 8px; border: none; border-bottom: 1px dashed #333;">
+        </div>
+
+    </div>
+    
+    <div class="app-controls" style="text-align: center;">
+        <button class="btn btn-warning" onclick="showPaymentPopup()">Payer 200 F CFA & Télécharger PDF</button>
+        <button class="btn btn-primary" onclick="sendWhatsApp()">Envoyer le Récap par WhatsApp</button>
+        <p style="margin-top: 15px;"><a href="catalogue.html">&larr; Modifier la sélection des produits</a></p>
+    </div>
+</div>
+
+<div id="payment-popup" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000;">
+    <div style="background: white; padding: 30px; border-radius: 8px; text-align: center; max-width: 450px;">
+        <h3>Simulation de Paiement Mobile Money 💳</h3>
+        <p>Prix de la génération PDF : **200 F CFA**</p>
+        <p>Une fois le paiement effectué via l'API, le téléchargement se lancera automatiquement.</p>
+        <input type="number" placeholder="Votre numéro MoMo (Simulation)" style="width: 90%; padding: 10px; margin-bottom: 15px;">
+        <button class="btn btn-success" onclick="simulatePaymentSuccess()">Confirmer PAIEMENT de 200 F CFA</button>
+        <p style="margin-top: 10px; cursor: pointer;" onclick="document.getElementById('payment-popup').style.display='none';">Annuler</p>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', initializeRecap);
+    
+    const TVA_RATE = 0.20; 
+
+    function initializeRecap() {
+        const devisInfo = JSON.parse(localStorage.getItem('devis_info')) || {};
+        const devisLines = JSON.parse(localStorage.getItem('devis_lines')) || [];
+        
+        const productsTotalHT = parseFloat(localStorage.getItem('products_total_ht')) || 0;
+        const totalMO = devisInfo.mo_total || 0;
+
+        // 1. Affichage des infos client/société
+        document.getElementById('societe-info').innerHTML = `
+            <h3>${devisInfo.societe || 'SOCIÉTÉ À DÉFINIR'}</h3>
+            <p>Adresse: ${devisInfo.adresse || 'Non renseignée'}</p>
+            <p>SIRET: ${devisInfo.siret || 'Non renseigné'}</p>
+        `;
+        document.getElementById('client-info').innerHTML = `
+            <p><strong>Devis N°: ${devisInfo.num_devis || 'N/A'}</strong></p>
+            <p><strong>Client :</strong> ${devisInfo.client_nom || 'CLIENT INCONNU'}</p>
+            <p>Chantier : ${devisInfo.client_adresse || 'Non renseignée'}</p>
+            <p>Date : ${new Date().toLocaleDateString('fr-FR')}</p>
+        `;
+
+        // 2. Affichage des lignes de produits et Main d'Œuvre
+        const tbody = document.getElementById('recap-tbody');
+        tbody.innerHTML = '';
+        
+        // Lignes Produits
+        devisLines.filter(line => (line.qty || 0) > 0).forEach(line => {
+            const lineTotal = (line.qty || 0) * (line.price || 0);
+            const row = tbody.insertRow();
+            row.innerHTML = `
+                <td>${line.designation} <span style="font-size: 0.8em; color: #666;">(${line.cat})</span></td>
+                <td>${line.qty}</td>
+                <td>${line.price.toLocaleString('fr-FR')} F</td>
+                <td>${lineTotal.toLocaleString('fr-FR')} F</td>
+            `;
+        });
+        
+        // Ligne Main d'Œuvre (ajoutée après les produits)
+        if (totalMO > 0) {
+            const moRow = tbody.insertRow();
+            moRow.style.fontWeight = 'bold';
+            moRow.innerHTML = `
+                <td>MAIN D'ŒUVRE (Forfait ${devisInfo.nb_heures || ''}h)</td>
+                <td>1</td>
+                <td>${totalMO.toLocaleString('fr-FR')} F</td>
+                <td>${totalMO.toLocaleString('fr-FR')} F</td>
+            `;
+        }
+        
+        // 3. Calcul des totaux
+        const grandTotalHT = productsTotalHT + totalMO;
+        const tvaAmount = grandTotalHT * TVA_RATE;
+        const grandTotalTTC = grandTotalHT + tvaAmount;
+
+        // 4. Affichage des totaux
+        document.getElementById('total-produits').textContent = productsTotalHT.toLocaleString('fr-FR') + ' F CFA';
+        document.getElementById('total-mo').textContent = totalMO.toLocaleString('fr-FR') + ' F CFA';
+        document.getElementById('grand-total-ht').textContent = grandTotalHT.toLocaleString('fr-FR') + ' F CFA';
+        document.getElementById('tva-amount').textContent = tvaAmount.toLocaleString('fr-FR') + ' F CFA';
+        document.getElementById('grand-total-ttc').textContent = grandTotalTTC.toLocaleString('fr-FR') + ' F CFA';
+    }
+
+    function showPaymentPopup() {
+        document.getElementById('payment-popup').style.display = 'flex';
+    }
+    
+    function simulatePaymentSuccess() {
+        alert("Simule la transaction Mobile Money...");
+        document.getElementById('payment-popup').style.display = 'none';
+        
+        // 1. Cacher les contrôles de l'application
+        document.querySelectorAll('.header, .app-controls, .signature-zone input').forEach(el => el.style.display = 'none');
+        
+        // 2. Générer le PDF
+        const element = document.querySelector('.devis-content');
+        html2pdf(element, {
+            margin: 10,
+            filename: `Devis_${JSON.parse(localStorage.getItem('devis_info')).num_devis}.pdf`,
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        });
+
+        // 3. Simuler la restauration (en environnement réel, cette page serait rechargée après le paiement)
+        setTimeout(() => {
+             document.querySelectorAll('.header, .app-controls, .signature-zone input').forEach(el => el.style.display = '');
+        }, 3000);
+    }
+
+    function sendWhatsApp() {
+        const devisInfo = JSON.parse(localStorage.getItem('devis_info')) || {};
+        const clientName = devisInfo.client_nom || "Client";
+        const totalTTC = document.getElementById('grand-total-ttc').textContent;
+
+        const message = encodeURIComponent(
+            `Bonjour ${clientName},\n\nVotre devis n° ${devisInfo.num_devis} est prêt.\nMontant Total TTC : ${totalTTC}.\n\nVeuillez procéder au paiement de 200 F CFA sur notre portail pour télécharger le PDF final.`
+        );
+        const whatsappUrl = `https://wa.me/?text=${message}`;
+        window.open(whatsappUrl, '_blank');
+    }
+</script>
+
+</body>
+</html>

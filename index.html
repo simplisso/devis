@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Portail Pro - Connexion</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="header">
+    <h1>Mon Portail de Devis Électrique Pro</h1>
+    <p>Créez, modifiez et partagez vos devis en ligne.</p>
+</div>
+
+<div class="container" style="display: flex; gap: 40px;">
+    <div style="flex: 1;">
+        <h2>Bienvenue sur l'Espace Artisan !</h2>
+        <p>Générez des devis professionnels et sauvegardez-les sur votre compte.</p>
+        
+        <h3>Avantages :</h3>
+        <ul>
+            <li>✅ **Sauvegarde Cloud** de tous vos projets.</li>
+            <li>✅ Accès au **Catalogue Fournisseur** modifiable.</li>
+            <li>✅ Génération PDF après paiement sécurisé.</li>
+        </ul>
+        
+        <p style="margin-top: 30px;">Continuer sans compte pour un devis unique :</p>
+        <button class="btn btn-secondary" onclick="window.location.href='client_info.html';">Devis Rapide (Non Sauvegardé)</button>
+    </div>
+
+    <div style="flex: 1; padding: 20px; background-color: #f8f8f8; border-radius: 6px;">
+        <h2>Connexion / Inscription</h2>
+        <form id="authForm">
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" placeholder="Votre email professionnel" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Mot de passe:</label>
+                <input type="password" id="password" placeholder="Mot de passe" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Se Connecter / Créer un Compte</button>
+            <p style="text-align: center; margin-top: 15px; font-size: 0.8em;">(La connexion est simulée. Tout accès mène à l'étape suivante.)</p>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Nouvelle section <script> dans votre fichier index.html (Front-End)
+    const API_URL = 'http://localhost:3000/api/auth';
+
+    document.getElementById('authForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+
+        // 1. Tenter la CONNEXION (LOGIN)
+        fetch(`${API_URL}/login`, { 
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email, password })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.token) {
+                // 1.1 Connexion réussie : stocker le token et les infos
+                localStorage.setItem('userToken', data.token);
+                // Stocker le nom de la société pour pré-remplir client_info.html
+                localStorage.setItem('userSociete', data.user.nom_societe); 
+                alert(`Connexion réussie ! Bienvenue ${data.user.nom_societe}.`);
+                // Redirection vers l'étape de saisie client
+                window.location.href = 'client_info.html'; 
+            } else {
+                // 1.2 Si le login échoue (Identifiants invalides ou compte inexistant), proposer l'inscription
+                attemptRegistration(email, password);
+            }
+        })
+        .catch(error => {
+            console.error('Erreur réseau lors de la connexion:', error);
+            alert('Erreur réseau. Assurez-vous que le serveur Node.js est démarré sur le port 3000.');
+        });
+    });
+
+    function attemptRegistration(email, password) {
+        // Demander le nom de la société pour l'inscription
+        const nom_societe = prompt("Identifiants invalides. Si vous êtes nouveau, veuillez entrer le nom de votre Société pour l'inscription :");
+        
+        if (!nom_societe) return;
+
+        // 2. Tenter l'INSCRIPTION (REGISTER)
+        fetch(`${API_URL}/register`, { 
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email, password, nom_societe })
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.message);
+            if (data.message.includes('succès')) {
+                // Si l'inscription réussit, re-tenter la connexion automatiquement
+                // On simule la soumission du formulaire pour lancer le login avec les nouvelles données
+                document.getElementById('authForm').submit(); 
+            }
+        })
+        .catch(error => {
+            console.error('Erreur réseau lors de l\'inscription:', error);
+            alert('Erreur serveur lors de l\'inscription.');
+        });
+    }
+    
+    // Mise à jour de client_info.html pour utiliser les données de l'utilisateur
+    document.addEventListener('DOMContentLoaded', initializeClientInfo);
+    function initializeClientInfo() {
+        // Si l'utilisateur a un nom de société stocké (après connexion), on pré-remplit le champ
+        const societe = localStorage.getItem('userSociete');
+        if (societe && document.getElementById('ma_societe')) {
+             document.getElementById('ma_societe').value = societe;
+        }
+    }
+
+    // Le bouton "Devis Rapide" ne nécessite pas de connexion
+    document.querySelector('.btn-secondary').addEventListener('click', function(e) {
+        // Supprime le token existant pour forcer un devis non authentifié
+        localStorage.removeItem('userToken'); 
+        window.location.href = 'client_info.html';
+    });
+</script>
+    
+</body>
+</html>
