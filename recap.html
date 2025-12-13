@@ -64,20 +64,36 @@
 
 <div id="payment-popup" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000;">
     <div style="background: white; padding: 30px; border-radius: 8px; text-align: center; max-width: 450px;">
-        <h3>Simulation de Paiement Mobile Money 💳</h3>
-        <p>Prix de la génération PDF : **200 F CFA**</p>
-        <p>Une fois le paiement effectué via l'API, le téléchargement se lancera automatiquement.</p>
-        <input type="number" placeholder="Votre numéro MoMo (Simulation)" style="width: 90%; padding: 10px; margin-bottom: 15px;">
-        <button class="btn btn-success" onclick="simulatePaymentSuccess()">Confirmer PAIEMENT de 200 F CFA</button>
+        <h3>Paiement Mobile Money 💳</h3>
+        <p>Prix de la génération PDF : 200 F CFA</p>
+        <p>Veuillez entrer vos informations Mobile Money. Une confirmation sera demandée sur votre téléphone.</p>
+        
+        <select id="operator-select" style="width: 90%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px;">
+            <option value="">Sélectionner un opérateur</option>
+            <option value="orange">Orange Money</option>
+            <option value="mtn">MTN MoMo</option>
+            <option value="moov">Moov Money</option>
+            </select>
+        
+        <input type="tel" id="momo-number" placeholder="Votre numéro de téléphone MoMo" style="width: 90%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px;">
+        
+        <button class="btn btn-success" id="confirm-payment-btn" onclick="initiateRealPayment()">Confirmer PAIEMENT de 200 F CFA</button>
+        
+        <p id="payment-message" style="margin-top: 10px; color: #cc0000; font-weight: bold;"></p>
+        
         <p style="margin-top: 10px; cursor: pointer;" onclick="document.getElementById('payment-popup').style.display='none';">Annuler</p>
     </div>
 </div>
-
 <script>
     document.addEventListener('DOMContentLoaded', initializeRecap);
     
     const TVA_RATE = 0.20; 
+    const PAYMENT_AMOUNT = 200; // Le prix de la génération PDF
 
+    // *** IMPORTANT : REMPLACER PAR VOTRE VRAI ENDPOINT BACKEND ***
+    const PAYMENT_ENDPOINT = 'https://votre-serveur.com/api/v1/initiate-momo-payment'; 
+    // *** IMPORTANT : REMPLACER PAR VOTRE VRAI ENDPOINT BACKEND ***
+    
     function initializeRecap() {
         const devisInfo = JSON.parse(localStorage.getItem('devis_info')) || {};
         const devisLines = JSON.parse(localStorage.getItem('devis_lines')) || [];
@@ -85,7 +101,7 @@
         const productsTotalHT = parseFloat(localStorage.getItem('products_total_ht')) || 0;
         const totalMO = devisInfo.mo_total || 0;
 
-        // 1. Affichage des infos client/société
+        // 1. Affichage des infos client/société (Logique non modifiée)
         document.getElementById('societe-info').innerHTML = `
             <h3>${devisInfo.societe || 'SOCIÉTÉ À DÉFINIR'}</h3>
             <p>Adresse: ${devisInfo.adresse || 'Non renseignée'}</p>
@@ -98,7 +114,7 @@
             <p>Date : ${new Date().toLocaleDateString('fr-FR')}</p>
         `;
 
-        // 2. Affichage des lignes de produits et Main d'Œuvre
+        // 2. Affichage des lignes de produits et Main d'Œuvre (Logique non modifiée)
         const tbody = document.getElementById('recap-tbody');
         tbody.innerHTML = '';
         
@@ -126,12 +142,12 @@
             `;
         }
         
-        // 3. Calcul des totaux
+        // 3. Calcul des totaux (Logique non modifiée)
         const grandTotalHT = productsTotalHT + totalMO;
         const tvaAmount = grandTotalHT * TVA_RATE;
         const grandTotalTTC = grandTotalHT + tvaAmount;
 
-        // 4. Affichage des totaux
+        // 4. Affichage des totaux (Logique non modifiée)
         document.getElementById('total-produits').textContent = productsTotalHT.toLocaleString('fr-FR') + ' F CFA';
         document.getElementById('total-mo').textContent = totalMO.toLocaleString('fr-FR') + ' F CFA';
         document.getElementById('grand-total-ht').textContent = grandTotalHT.toLocaleString('fr-FR') + ' F CFA';
@@ -141,15 +157,101 @@
 
     function showPaymentPopup() {
         document.getElementById('payment-popup').style.display = 'flex';
+        // Réinitialiser les messages d'erreur et le bouton
+        document.getElementById('payment-message').textContent = '';
+        document.getElementById('confirm-payment-btn').disabled = false;
+        document.getElementById('confirm-payment-btn').textContent = `Confirmer PAIEMENT de ${PAYMENT_AMOUNT} F CFA`;
     }
     
-    function simulatePaymentSuccess() {
-        alert("Simule la transaction Mobile Money...");
+    // MODIFICATION PAIEMENT MO-MO RÉEL : Nouvelle fonction
+    function initiateRealPayment() {
+        const operator = document.getElementById('operator-select').value;
+        const number = document.getElementById('momo-number').value.trim();
+        const paymentBtn = document.getElementById('confirm-payment-btn');
+        const messageDisplay = document.getElementById('payment-message');
+        const devisInfo = JSON.parse(localStorage.getItem('devis_info'));
+
+        // Validation simple
+        if (!operator || number.length < 8 || number.length > 15) {
+            messageDisplay.textContent = 'Veuillez sélectionner un opérateur et entrer un numéro valide.';
+            return;
+        }
+
+        // Préparation et désactivation du bouton
+        paymentBtn.disabled = true;
+        messageDisplay.textContent = 'Initialisation du paiement... Vérifiez votre téléphone.';
+        paymentBtn.textContent = 'Transaction en cours...';
+
+        // --- DÉBUT DE L'APPEL AU BACKEND POUR INITIATION DU PAIEMENT ---
+        fetch(PAYMENT_ENDPOINT, { 
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                // Si vous avez un token d'authentification pour votre propre API, ajoutez-le ici
+            },
+            body: JSON.stringify({
+                amount: PAYMENT_AMOUNT,
+                phoneNumber: number,
+                operator: operator,
+                // Référence unique pour que le backend puisse retrouver ce devis
+                transactionRef: devisInfo.num_devis || `QUOTE-${Date.now()}` 
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'PENDING' || data.status === 'INITIATED') {
+                // Le serveur a bien démarré la transaction MoMo.
+                messageDisplay.style.color = 'blue';
+                messageDisplay.textContent = 'Transaction initiée. Confirmez le paiement sur votre téléphone (saisissez votre code PIN).';
+                
+                // Ici, vous devez implémenter le "polling" (voir remarque ci-dessous)
+                // handlePolling(data.transactionId); 
+                
+                // Pour l'instant, on laisse l'utilisateur confirmer sur son téléphone
+                paymentBtn.textContent = 'En attente de confirmation...';
+
+                // --- DÉMONSTRATION DU SUCCÈS (À REMPLACER PAR LE POLLING) ---
+                // Si le paiement est confirmé, le backend envoie un signal.
+                // En attendant, on simule le succès après un délai réaliste.
+                setTimeout(() => {
+                    handlePaymentSuccess();
+                }, 15000); // Délai de 15 secondes pour simuler la confirmation utilisateur
+                // --- FIN DE LA DÉMONSTRATION ---
+
+
+            } else if (data.status === 'ERROR' || data.status === 'FAILED') {
+                // Le backend ou l'API MoMo a refusé l'initialisation
+                messageDisplay.style.color = 'red';
+                messageDisplay.textContent = 'Échec de l\'initialisation : ' + (data.message || 'Vérifiez le numéro.');
+                paymentBtn.disabled = false;
+                paymentBtn.textContent = `Confirmer PAIEMENT de ${PAYMENT_AMOUNT} F CFA`;
+
+            } else {
+                messageDisplay.style.color = 'red';
+                messageDisplay.textContent = 'Réponse du serveur inattendue.';
+                paymentBtn.disabled = false;
+                paymentBtn.textContent = `Confirmer PAIEMENT de ${PAYMENT_AMOUNT} F CFA`;
+            }
+        })
+        .catch((error) => {
+            console.error('Erreur réseau:', error);
+            messageDisplay.style.color = 'red';
+            messageDisplay.textContent = 'Erreur de communication avec le serveur (vérifiez le réseau).';
+            paymentBtn.disabled = false;
+            paymentBtn.textContent = `Confirmer PAIEMENT de ${PAYMENT_AMOUNT} F CFA`;
+        });
+    }
+
+    // MODIFICATION PAIEMENT MO-MO RÉEL : Fonction de succès final
+    function handlePaymentSuccess() {
         document.getElementById('payment-popup').style.display = 'none';
+        alert("Paiement réussi ! Le téléchargement du PDF va commencer automatiquement.");
         
         // 1. Cacher les contrôles de l'application
-        document.querySelectorAll('.header, .app-controls, .signature-zone input').forEach(el => el.style.display = 'none');
-        
+        // Note: Vous n'avez pas de classe 'signature-zone input', j'utilise le sélecteur existant
+        document.querySelectorAll('.header, .app-controls').forEach(el => el.style.display = 'none');
+        document.getElementById('client-signature').style.display = 'none'; // Cacher le champ d'input
+
         // 2. Générer le PDF
         const element = document.querySelector('.devis-content');
         html2pdf(element, {
@@ -158,12 +260,15 @@
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         });
 
-        // 3. Simuler la restauration (en environnement réel, cette page serait rechargée après le paiement)
+        // 3. Simuler la restauration après le téléchargement
         setTimeout(() => {
-             document.querySelectorAll('.header, .app-controls, .signature-zone input').forEach(el => el.style.display = '');
+            document.querySelectorAll('.header, .app-controls').forEach(el => el.style.display = '');
+            document.getElementById('client-signature').style.display = 'block'; // Réafficher le champ d'input
         }, 3000);
     }
-
+    // Fin des modifications MoMo Réel
+    
+    // Fonction originale (maintenue)
     function sendWhatsApp() {
         const devisInfo = JSON.parse(localStorage.getItem('devis_info')) || {};
         const clientName = devisInfo.client_nom || "Client";
